@@ -1,0 +1,12 @@
+{
+  "name": "nejen-kafe-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot pro denní reporty Nejen Kafe",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
