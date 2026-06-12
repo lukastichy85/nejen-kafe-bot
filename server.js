@@ -15,14 +15,14 @@ async function sendTelegram(text) {
     text,
     parse_mode: "HTML",
   });
-  const options = {
-    hostname: "api.telegram.org",
-    path: `/bot${TELEGRAM_TOKEN}/sendMessage`,
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
-  };
   return new Promise((resolve, reject) => {
-    const req = http.request({ ...options, hostname: "api.telegram.org" }, (res) => {
+    const https = require("https");
+    const req = https.request({
+      hostname: "api.telegram.org",
+      path: `/bot${TELEGRAM_TOKEN}/sendMessage`,
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
+    }, (res) => {
       let data = "";
       res.on("data", (chunk) => (data += chunk));
       res.on("end", () => resolve(JSON.parse(data)));
