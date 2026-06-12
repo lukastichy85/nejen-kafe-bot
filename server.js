@@ -6,7 +6,7 @@ const http = require("http");
 
 const TELEGRAM_TOKEN = "8926834458:AAHbuFG3kkl9JBqQ-UrJFmItwUY4Y1f3OS0";
 const CHAT_ID = "8680493259";
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // ─── Telegram helper ───────────────────────────────────────────────────────────
 async function sendTelegram(text) {
