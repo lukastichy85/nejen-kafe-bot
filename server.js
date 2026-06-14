@@ -35,47 +35,25 @@ async function sendTelegram(text) {
 
 // ─── Zpracování dat z Dotykačky ────────────────────────────────────────────────
 function processWebhookData(payload) {
-  // Dotykačka posílá data o uzavření dne / receipts
-  // Formát závisí na typu webhooky - zde zpracujeme orders/receipts
-  
-  const orders = payload.orders || payload.receipts || payload.data || [];
-  
-  if (!orders.length) {
-    return { totalTrzby: 0, pocetDokladu: 0, kategorie: {}, topProdukty: [] };
-  }
+  // Dotykačka posílá pole objednávek přímo jako array
+  const orders = Array.isArray(payload) ? payload : (payload.orders || payload.data || [payload]);
 
   let totalTrzby = 0;
   let pocetDokladu = 0;
-  const kategorie = {};
-  const produkty = {};
+  let totalKusy = 0;
 
   for (const order of orders) {
-    const items = order.items || order.orderItems || [];
-    pocetDokladu++;
-    
-    for (const item of items) {
-      const cena = parseFloat(item.totalPrice || item.price || 0);
-      const nazev = item.name || item.productName || "Neznámý";
-      const kat = item.category || item.categoryName || "Ostatní";
-      const mnozstvi = parseFloat(item.quantity || 1);
+    if (order.status !== "closed") continue;
+    const cena = parseFloat(order.totalvaluerounded || 0);
+    const kusy = parseInt(order.itemcount || 0);
 
-      totalTrzby += cena;
-      kategorie[kat] = (kategorie[kat] || 0) + cena;
-      
-      if (!produkty[nazev]) produkty[nazev] = { trzby: 0, mnozstvi: 0 };
-      produkty[nazev].trzby += cena;
-      produkty[nazev].mnozstvi += mnozstvi;
-    }
+    totalTrzby += cena;
+    totalKusy += kusy;
+    pocetDokladu++;
   }
 
-  const topProdukty = Object.entries(produkty)
-    .map(([name, v]) => ({ name, ...v }))
-    .sort((a, b) => b.trzby - a.trzby)
-    .slice(0, 5);
-
-  return { totalTrzby, pocetDokladu, kategorie, topProdukty };
+  return { totalTrzby, pocetDokladu, totalKusy, kategorie: {}, topProdukty: [] };
 }
-
 // ─── Sestavení zprávy do Telegramu ────────────────────────────────────────────
 function buildReportMessage(data, pokladna, datum) {
   const fmt = (n) => Math.round(n).toLocaleString("cs-CZ") + " Kč";
@@ -92,43 +70,14 @@ function buildReportMessage(data, pokladna, datum) {
   if (data.pocetDokladu > 0) {
     msg += `📊 Průměr/doklad: ${fmt(data.totalTrzby / data.pocetDokladu)}\n`;
   }
-
-  // Kategorie
-  const katEntries = Object.entries(data.kategorie).sort((a, b) => b[1] - a[1]);
-  if (katEntries.length > 0) {
-    msg += `\n<b>Tržby dle kategorií:</b>\n`;
-    const katEmoji = {
-      "Káva": "☕", "Sladké": "🥐", "Slané": "🥪", "MENU": "🍳",
-      "Nealko": "🍋", "Obchod": "🛒", "Teplé nápoje": "🍵", "Zrna": "🫘"
-    };
-    for (const [kat, trzby] of katEntries) {
-      if (trzby > 0) {
-        const emoji = katEmoji[kat] || "•";
-        const pct = ((trzby / data.totalTrzby) * 100).toFixed(0);
-        msg += `${emoji} ${kat}: ${fmt(trzby)} (${pct}%)\n`;
-      }
+if (data.totalKusy > 0) {
+      msg += `🛍️ Prodaných kusů: ${data.totalKusy}\n`;
     }
-  }
 
-  // Top produkty
-  if (data.topProdukty.length > 0) {
-    msg += `\n<b>Top produkty:</b>\n`;
-    data.topProdukty.forEach((p, i) => {
-      msg += `${i + 1}. ${p.name} — ${fmt(p.trzby)} (${p.mnozstvi} ks)\n`;
-    });
-  }
-
-  // Doporučení
-  const kavaTrzby = data.kategorie["Káva"] || 0;
-  const kavaPct = data.totalTrzby > 0 ? (kavaTrzby / data.totalTrzby) * 100 : 0;
-  
-  msg += `\n<b>💡 Poznámky:</b>\n`;
-  if (kavaPct > 40) msg += `✅ Silný den na kávě (${kavaPct.toFixed(0)}%)\n`;
-  if (kavaPct < 25 && data.totalTrzby > 0) msg += `⚠️ Káva pod 25% tržeb — zkontroluj\n`;
-  if (data.totalTrzby > 15000) msg += `🎉 Výborný den — přes 15 000 Kč!\n`;
-  if (data.totalTrzby < 5000 && data.totalTrzby > 0) msg += `📉 Slabší den — pod 5 000 Kč\n`;
-  if (data.pocetDokladu > 80) msg += `🚀 Hodně zákazníků dnes (${data.pocetDokladu} dokladů)\n`;
-
+    msg += `\n<b>💡 Poznámky:</b>\n`;
+    if (data.totalTrzby > 15000) msg += `🎉 Výborný den — přes 15 000 Kč!\n`;
+    if (data.totalTrzby < 5000 && data.totalTrzby > 0) msg += `📉 Slabší den — pod 5 000 Kč\n`;
+    if (data.pocetDokladu > 80) msg += `🚀 Hodně zákazníků dnes (${data.pocetDokladu} dokladů)\n`;
   msg += `\n─────────────────────────────`;
   return msg;
 }
