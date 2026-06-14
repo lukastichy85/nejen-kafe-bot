@@ -179,6 +179,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const payload = JSON.parse(body);
         console.log("Webhook přijat:", new Date().toISOString());
+        console.log("RAW PAYLOAD:", JSON.stringify(payload));
         
         const pokladna = payload.cloudId || payload.branchName || payload.cashRegisterName || null;
         const datum = payload.date || new Date().toLocaleDateString("cs-CZ");
