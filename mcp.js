@@ -231,7 +231,8 @@ async function salesReport({ od, do: doDne, pobocka, top = 20 }) {
       trzby_kc: round(total),
       uctenek: orders.length,
       prumerna_uctenka_kc: orders.length ? round(total / orders.length) : 0,
-      stornovanych_vyrazeno: raw.length - orders.length,
+      stornovanych_vyrazeno: raw.length - valid.length,
+      odpisovych_uctu: valid.length - orders.length,
     },
     pobocky: Object.values(branches).map((b) => ({
       ...b, trzby: round(b.trzby), prumerna_uctenka: b.uctenek ? round(b.trzby / b.uctenek) : 0,
