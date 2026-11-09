@@ -27,6 +27,31 @@ const SCHEDULE = {
   weekend: { melnik: ["09:00", "14:00"], mb: ["09:00", "14:00"] },
 };
 
+// ─── Svátky a zavřeno ─────────────────────────────────────────────────────────
+// Státní svátky = víkendový režim. Zavřeno = žádné fotky.
+const CLOSED_MMDD = ["12-24", "12-25", "12-26", "01-01"];
+const FIXED_HOLIDAYS_MMDD = ["01-01", "05-01", "05-08", "07-05", "07-06", "09-28", "10-28", "11-17", "12-24", "12-25", "12-26"];
+
+function easterSunday(year) {
+  // Anonymní gregoriánský algoritmus
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function isHoliday(ymd) {
+  const mmdd = ymd.slice(5);
+  if (FIXED_HOLIDAYS_MMDD.includes(mmdd)) return true;
+  const year = Number(ymd.slice(0, 4));
+  const easter = easterSunday(year).getTime();
+  const iso = (ms) => new Date(ms).toISOString().slice(0, 10);
+  return ymd === iso(easter - 2 * 864e5) || ymd === iso(easter + 864e5); // Velký pátek, Velikonoční pondělí
+}
+
+const isClosed = (ymd) => CLOSED_MMDD.includes(ymd.slice(5));
+
 // ─── Čas v Praze ──────────────────────────────────────────────────────────────
 function pragueNow(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -34,10 +59,12 @@ function pragueNow(date = new Date()) {
     hour: "2-digit", minute: "2-digit", weekday: "short",
   }).formatToParts(date);
   const g = (t) => parts.find((p) => p.type === t).value;
+  const day = `${g("year")}-${g("month")}-${g("day")}`;
   return {
-    day: `${g("year")}-${g("month")}-${g("day")}`,
+    day,
     minutes: Number(g("hour")) * 60 + Number(g("minute")),
-    weekend: ["Sat", "Sun"].includes(g("weekday")),
+    weekend: ["Sat", "Sun"].includes(g("weekday")) || isHoliday(day),
+    closed: isClosed(day),
   };
 }
 
@@ -46,7 +73,8 @@ const toMin = (hhmm) => {
   return h * 60 + m;
 };
 
-function slotsFor(weekend) {
+function slotsFor(weekend, closed = false) {
+  if (closed) return [];
   const s = weekend ? SCHEDULE.weekend : SCHEDULE.weekday;
   const out = [];
   for (const [branch, times] of Object.entries(s)) for (const t of times) out.push({ branch, time: t });
@@ -67,7 +95,7 @@ const fmt = (min) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(
 
 // Ke kterému termínu fotka patří (nejbližší otevřený termín dané pobočky)
 function matchSlot(branch, now) {
-  const slots = slotsFor(now.weekend).filter((s) => s.branch === branch);
+  const slots = slotsFor(now.weekend, now.closed).filter((s) => s.branch === branch);
   const ds = dayState(now.day);
   let best = null;
   for (const s of slots) {
@@ -156,7 +184,7 @@ async function handleMessage(msg) {
 async function checkSlots() {
   const now = pragueNow();
   const ds = dayState(now.day);
-  for (const s of slotsFor(now.weekend)) {
+  for (const s of slotsFor(now.weekend, now.closed)) {
     const key = `${s.branch}|${s.time}`;
     const due = toMin(s.time) + TOLERANCE;
     if (now.minutes < due || now.minutes > due + 60) continue; // připomínáme jen v hodině po termínu
@@ -179,9 +207,10 @@ async function checkSlots() {
 function summaryText(now) {
   const ds = dayState(now.day);
   let msg = `📷 <b>Fotky vitríny – ${now.day}</b>\n`;
+  if (now.closed) return msg + "\nDnes je zavřeno.";
   for (const branch of Object.keys(BRANCHES)) {
     msg += `\n<b>${BRANCHES[branch].name}</b>\n`;
-    for (const s of slotsFor(now.weekend).filter((x) => x.branch === branch)) {
+    for (const s of slotsFor(now.weekend, now.closed).filter((x) => x.branch === branch)) {
       const st = ds[`${branch}|${s.time}`] || {};
       const pending = now.minutes < toMin(s.time) + TOLERANCE;
       msg += st.photoAt
@@ -222,4 +251,4 @@ function start({ token, ownerChatId }) {
   console.log("Hlídání fotek vitríny spuštěno");
 }
 
-module.exports = { start, _test: { pragueNow, matchSlot, slotsFor, summaryText, handleMessage, checkSlots, state } };
+module.exports = { start, _test: { isHoliday, isClosed, easterSunday, pragueNow, matchSlot, slotsFor, summaryText, handleMessage, checkSlots, state } };
