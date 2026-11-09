@@ -19,6 +19,14 @@ const DRINK_KEYWORDS = (process.env.NAPOJE_KLICOVA_SLOVA ||
   "filtr,batch,v60,chemex,aeropress,cold brew,čaj,matcha,chai,čokoláda,kakao,mléko,limonáda,džus,juice,voda,sirup,personál")
   .split(",").map((k) => k.trim().toLowerCase()).filter(Boolean);
 
+// "Odpis koláček" / "Odpis - šnek" → "koláček" / "šnek", aby se odpis spároval s prodejním produktem
+function baseName(name) {
+  return String(name || "").replace(/^\s*odpis[\s:\-–]*/i, "").trim();
+}
+function productKey(name) {
+  return baseName(name).toLowerCase().replace(/\s+/g, " ");
+}
+
 function isDrink(name) {
   const n = String(name || "").toLowerCase();
   return DRINK_KEYWORDS.some((k) => n.includes(k));
@@ -187,13 +195,13 @@ async function salesReport({ od, do: doDne, pobocka, top = 20 }) {
     const p = pragueParts(o.completed || o.created);
     for (const it of o.orderItems || o.items || []) {
       if (it.canceledDate) continue;
-      const key = it._productId != null ? String(it._productId) : it.name;
+      const key = productKey(it.name);
       if (isDrink(it.name)) {
         drinkWriteOffs[key] ??= { nazev: it.name || key, kusy: 0 };
         drinkWriteOffs[key].kusy += num(it.quantity);
         continue;
       }
-      writeOffs[key] ??= { nazev: it.name || key, kusy: 0, dny: {} };
+      writeOffs[key] ??= { nazev: baseName(it.name) || key, kusy: 0, dny: {} };
       writeOffs[key].kusy += num(it.quantity);
       writeOffs[key].dny[p.day] = (writeOffs[key].dny[p.day] || 0) + num(it.quantity);
     }
@@ -305,10 +313,10 @@ async function dailyProducts({ od, do: doDne, pobocka, hledat }) {
       if (it.canceledDate) continue;
       if (q && !String(it.name || "").toLowerCase().includes(q)) continue;
       if (writeOff && isDrink(it.name)) continue; // personální káva / odpis kávy – nepatří do výroby
-      const key = `${p.day}|${o._branchId}|${it._productId ?? it.name}`;
+      const key = `${p.day}|${o._branchId}|${productKey(it.name)}`;
       rows[key] ??= {
         den: p.day, den_v_tydnu: WEEKDAY_CS[p.weekday], pobocka: branchName(o._branchId),
-        produkt: it.name, prodano: 0, odpis: 0, prvni_prodej: null, posledni_prodej: null,
+        produkt: baseName(it.name), prodano: 0, odpis: 0, prvni_prodej: null, posledni_prodej: null,
       };
       const r = rows[key];
       if (writeOff) {
