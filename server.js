@@ -5,13 +5,14 @@
 
 const http = require("http");
 const { handleMcpRequest } = require("./mcp");
+const fotky = require("./fotky");
 
 // Tajná cesta pro MCP konektor (Claude). Bez MCP_SECRET je konektor vypnutý.
 const MCP_SECRET = process.env.MCP_SECRET || "";
 const MCP_PATH = MCP_SECRET ? `/mcp/${MCP_SECRET}` : null;
 
-const TELEGRAM_TOKEN = "8926834458:AAHbuFG3kkl9JBqQ-UrJFmItwUY4Y1f3OS0";
-const CHAT_ID = "8680493259";
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN || "8926834458:AAHbuFG3kkl9JBqQ-UrJFmItwUY4Y1f3OS0";
+const CHAT_ID = process.env.CHAT_ID || "8680493259";
 const PORT = process.env.PORT || 8080;
 
 // Hodina (0-23) kdy se posílá denní souhrn, v lokálním čase serveru (UTC).
@@ -246,6 +247,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
+  if (process.env.FOTKY_VYPNUTO !== "1") fotky.start({ token: TELEGRAM_TOKEN, ownerChatId: CHAT_ID });
   console.log(`Nejen Kafe Bot spuštěn na portu ${PORT}`);
   console.log(`Test: http://localhost:${PORT}/test`);
   console.log(`Webhook: http://localhost:${PORT}/webhook`);
