@@ -162,10 +162,24 @@ function round(n) {
 
 async function salesReport({ od, do: doDne, pobocka, top = 20 }) {
   const raw = await fetchOrders(od, doDne, pobocka);
-  const orders = raw.filter((o) => {
+  const valid = raw.filter((o) => {
     const type = String(o.documentType || "RECEIPT").toUpperCase();
     return !isCanceled(o) && !["CASH_IN", "CASH_OUT"].includes(type);
   });
+  // Večerní účet na 0 Kč s položkami = odpisy (neprodané zbytky), ne prodej
+  const isWriteOff = (o) => num(o.totalValueRounded) === 0 && (o.orderItems || o.items || []).length > 0;
+  const orders = valid.filter((o) => !isWriteOff(o));
+  const writeOffs = {};
+  for (const o of valid.filter(isWriteOff)) {
+    const p = pragueParts(o.completed || o.created);
+    for (const it of o.orderItems || o.items || []) {
+      if (it.canceledDate) continue;
+      const key = it._productId != null ? String(it._productId) : it.name;
+      writeOffs[key] ??= { nazev: it.name || key, kusy: 0, dny: {} };
+      writeOffs[key].kusy += num(it.quantity);
+      writeOffs[key].dny[p.day] = (writeOffs[key].dny[p.day] || 0) + num(it.quantity);
+    }
+  }
 
   const branches = {};
   const products = {};
@@ -234,6 +248,9 @@ async function salesReport({ od, do: doDne, pobocka, top = 20 }) {
     top_produkty_dle_trzeb: sortedByRevenue.slice(0, top),
     top_produkty_dle_kusu: sortedByQty.slice(0, top),
     nejslabsi_produkty: sortedByRevenue.filter((p) => p.trzby > 0).slice(-top).reverse(),
+    odpisy: Object.values(writeOffs)
+      .map((w) => ({ ...w, kusy: round(w.kusy) }))
+      .sort((a, b) => b.kusy - a.kusy),
   };
 }
 
@@ -245,6 +262,45 @@ async function productSales({ od, do: doDne, pobocka, hledat }) {
     list = list.filter((p) => String(p.nazev).toLowerCase().includes(q));
   }
   return { obdobi: report.obdobi, produktu: list.length, produkty: list };
+}
+
+// Po dnech a produktech: prodané kusy, čas posledního prodeje, odpis.
+// Produkt bez odpisu s posledním prodejem dlouho před zavírací dobou = pravděpodobně vyprodáno.
+async function dailyProducts({ od, do: doDne, pobocka, hledat }) {
+  const raw = await fetchOrders(od, doDne, pobocka);
+  const q = hledat ? hledat.toLowerCase() : null;
+  const rows = {};
+  for (const o of raw) {
+    const type = String(o.documentType || "RECEIPT").toUpperCase();
+    if (isCanceled(o) || ["CASH_IN", "CASH_OUT"].includes(type)) continue;
+    const items = o.orderItems || o.items || [];
+    const writeOff = num(o.totalValueRounded) === 0 && items.length > 0;
+    const ts = o.completed || o.created;
+    const p = pragueParts(ts);
+    const time = new Intl.DateTimeFormat("cs-CZ", { timeZone: TZ, hour: "2-digit", minute: "2-digit" })
+      .format(new Date(typeof ts === "number" ? ts : Date.parse(ts)));
+    for (const it of items) {
+      if (it.canceledDate) continue;
+      if (q && !String(it.name || "").toLowerCase().includes(q)) continue;
+      const key = `${p.day}|${o._branchId}|${it._productId ?? it.name}`;
+      rows[key] ??= {
+        den: p.day, den_v_tydnu: WEEKDAY_CS[p.weekday], pobocka: branchName(o._branchId),
+        produkt: it.name, prodano: 0, odpis: 0, prvni_prodej: null, posledni_prodej: null,
+      };
+      const r = rows[key];
+      if (writeOff) {
+        r.odpis += num(it.quantity);
+      } else {
+        r.prodano += num(it.quantity);
+        if (!r.prvni_prodej || time < r.prvni_prodej) r.prvni_prodej = time;
+        if (!r.posledni_prodej || time > r.posledni_prodej) r.posledni_prodej = time;
+      }
+    }
+  }
+  const list = Object.values(rows)
+    .map((r) => ({ ...r, prodano: round(r.prodano), odpis: round(r.odpis) }))
+    .sort((a, b) => (a.den + a.pobocka + a.produkt).localeCompare(b.den + b.pobocka + b.produkt, "cs"));
+  return { obdobi: { od, do: doDne }, radku: list.length, data: list };
 }
 
 // ─── Definice nástrojů ────────────────────────────────────────────────────────
@@ -281,6 +337,20 @@ const TOOLS = [
     },
     annotations: { readOnlyHint: true },
     handler: productSales,
+  },
+  {
+    name: "prodeje_po_dnech",
+    description:
+      "Pro plánování výroby: po dnech, pobočkách a produktech vrací prodané kusy, čas prvního a posledního prodeje " +
+      "a odpis (z večerního účtu na 0 Kč). Nulový odpis + poslední prodej dlouho před zavírací dobou znamená pravděpodobné vyprodání, " +
+      "skutečná poptávka pak byla vyšší než prodej. Pro delší období použij filtr 'hledat' (např. croissant, chléb).",
+    inputSchema: {
+      type: "object",
+      properties: { ...DATE_PROPS, hledat: { type: "string", description: "Část názvu produktu" } },
+      required: ["od", "do"],
+    },
+    annotations: { readOnlyHint: true },
+    handler: dailyProducts,
   },
   {
     name: "dotykacka_cteni",
