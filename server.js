@@ -4,6 +4,11 @@
 // Spustit: node server.js
 
 const http = require("http");
+const { handleMcpRequest } = require("./mcp");
+
+// Tajná cesta pro MCP konektor (Claude). Bez MCP_SECRET je konektor vypnutý.
+const MCP_SECRET = process.env.MCP_SECRET || "";
+const MCP_PATH = MCP_SECRET ? `/mcp/${MCP_SECRET}` : null;
 
 const TELEGRAM_TOKEN = "8926834458:AAHbuFG3kkl9JBqQ-UrJFmItwUY4Y1f3OS0";
 const CHAT_ID = "8680493259";
@@ -156,6 +161,20 @@ setInterval(checkAndSendDailyReport, 5 * 60 * 1000);
 
 // ─── HTTP Server ───────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
+  // MCP konektor pro Claude
+  if (MCP_PATH && req.url.split("?")[0] === MCP_PATH) {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => {
+      handleMcpRequest(req, res, body).catch((e) => {
+        console.error("Chyba MCP:", e.message);
+        if (!res.headersSent) res.writeHead(500);
+        res.end();
+      });
+    });
+    return;
+  }
+
   // Health check
   if (req.method === "GET" && req.url === "/") {
     res.writeHead(200, { "Content-Type": "text/plain" });
