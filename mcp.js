@@ -304,13 +304,13 @@ async function dailyProducts({ od, do: doDne, pobocka, hledat }) {
     for (const it of items) {
       if (it.canceledDate) continue;
       if (q && !String(it.name || "").toLowerCase().includes(q)) continue;
+      if (writeOff && isDrink(it.name)) continue; // personální káva / odpis kávy – nepatří do výroby
       const key = `${p.day}|${o._branchId}|${it._productId ?? it.name}`;
       rows[key] ??= {
         den: p.day, den_v_tydnu: WEEKDAY_CS[p.weekday], pobocka: branchName(o._branchId),
         produkt: it.name, prodano: 0, odpis: 0, prvni_prodej: null, posledni_prodej: null,
       };
       const r = rows[key];
-      if (writeOff && isDrink(it.name)) continue; // personální káva / odpis kávy – nepatří do výroby
       if (writeOff) {
         r.odpis += num(it.quantity);
       } else {
