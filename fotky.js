@@ -10,6 +10,7 @@
 //   FOTO_SOUHRN         – čas denního souhrnu majiteli, výchozí 14:30
 
 const https = require("https");
+const vitrina = require("./vitrina");
 
 const TZ = "Europe/Prague";
 const TOLERANCE = Number(process.env.FOTO_TOLERANCE_MIN || 15);
@@ -157,6 +158,12 @@ async function handleMessage(msg) {
     await send(msg.chat.id, summaryText(pragueNow()));
     return;
   }
+  if (text.startsWith("/vitrina")) {
+    const today = pragueNow().day;
+    const items = vitrina.history({ od: today, do: today });
+    await send(msg.chat.id, items.length ? items.map(vitrina.formatResult).join("\n\n") : "Dnes zatím žádná spočítaná vitrína.");
+    return;
+  }
 
   const hasPhoto = Boolean(msg.photo || (msg.document && /^image\//.test(msg.document.mime_type || "")));
   if (!hasPhoto) return;
@@ -178,6 +185,14 @@ async function handleMessage(msg) {
     chat_id: msg.chat.id, message_id: msg.message_id, reaction: [{ type: "emoji", emoji: late ? "👌" : "👍" }],
   }).catch(() => {});
   console.log(`Foto ${BRANCHES[branch].name} ${slot.time} přijato v ${fmt(now.minutes)}${late ? " (pozdě)" : ""}`);
+
+  // Počítání vitríny přes Claude (běží na pozadí, nezdržuje)
+  if (vitrina.enabled()) {
+    const fileId = msg.photo ? msg.photo[msg.photo.length - 1].file_id : msg.document.file_id;
+    vitrina.analyze({ token: TOKEN, fileId, pobocka: BRANCHES[branch].name, den: now.day, cas: fmt(now.minutes), termin: slot.time })
+      .then((r) => r && OWNER_CHAT && send(OWNER_CHAT, vitrina.formatResult(r)))
+      .catch((e) => console.error("Vitrína:", e.message));
+  }
 }
 
 // ─── Kontrola termínů ─────────────────────────────────────────────────────────

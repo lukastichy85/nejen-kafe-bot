@@ -334,6 +334,8 @@ async function dailyProducts({ od, do: doDne, pobocka, hledat }) {
   return { obdobi: { od, do: doDne }, radku: list.length, data: list };
 }
 
+const vitrina = require("./vitrina");
+
 // ─── Definice nástrojů ────────────────────────────────────────────────────────
 const DATE_PROPS = {
   od: { type: "string", description: "Začátek období včetně, RRRR-MM-DD (pražský čas)" },
@@ -382,6 +384,22 @@ const TOOLS = [
     },
     annotations: { readOnlyHint: true },
     handler: dailyProducts,
+  },
+  {
+    name: "vitrina_pocty",
+    description:
+      "Počty kusů ve vitríně spočítané z fotek obsluhy (Telegram) – ranní fotka = co se vyložilo, fotka ve 14:00 = co zbylo po obědě. " +
+      "Kombinuj s prodejem z Dotykačky: prodej po 14:00 + odpis ≈ stav ve 14:00. Historie se drží v paměti bota (posledních 60 dní od posledního restartu).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        od: { type: "string", description: "RRRR-MM-DD" },
+        do: { type: "string", description: "RRRR-MM-DD" },
+        pobocka: { type: "string", description: "Mělník nebo Mladá Boleslav" },
+      },
+    },
+    annotations: { readOnlyHint: true },
+    handler: async (a) => ({ zaznamu: vitrina.history(a).length, data: vitrina.history(a) }),
   },
   {
     name: "dotykacka_cteni",
