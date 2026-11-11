@@ -11,7 +11,8 @@ const fotky = require("./fotky");
 const MCP_SECRET = process.env.MCP_SECRET || "";
 const MCP_PATH = MCP_SECRET ? `/mcp/${MCP_SECRET}` : null;
 
-const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN || "8926834458:AAHbuFG3kkl9JBqQ-UrJFmItwUY4Y1f3OS0";
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
+if (!TELEGRAM_TOKEN) { console.error("Chybí TELEGRAM_TOKEN"); process.exit(1); }
 const CHAT_ID = process.env.CHAT_ID || "8680493259";
 const PORT = process.env.PORT || 8080;
 
