@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Připojení Dotykačky – Nejen Kafe</title>
+<style>
+  body{font-family:-apple-system,Segoe UI,Arial,sans-serif;max-width:520px;margin:40px auto;padding:0 20px;color:#222}
+  h1{font-size:22px}
+  label{display:block;margin:18px 0 6px;font-weight:600}
+  input{width:100%;box-sizing:border-box;font-size:18px;padding:12px;border:1px solid #bbb;border-radius:8px}
+  button{margin-top:24px;width:100%;font-size:20px;padding:16px;border:0;border-radius:10px;background:#2e7d32;color:#fff}
+  .note{color:#666;font-size:14px;margin-top:16px}
+  #err{color:#c62828;margin-top:12px}
+</style>
+</head>
+<body>
+<h1>Připojení Dotykačky (refresh token)</h1>
+<form id="f">
+  <label for="cid">Client ID</label>
+  <input id="cid" value="nejen_kafe_sales_reports" autocapitalize="off" autocorrect="off">
+  <label for="sec">Client Secret (vložte z e-mailu)</label>
+  <input id="sec" type="text" autocapitalize="off" autocorrect="off" spellcheck="false">
+  <label for="red">Redirect URI</label>
+  <input id="red" value="https://nejen-kafe.cz" autocapitalize="off" autocorrect="off">
+  <button type="submit">Připojit Dotykačku</button>
+  <div id="err"></div>
+</form>
+<p class="note">Secret se nikam neukládá, slouží jen k výpočtu podpisu přímo v prohlížeči.
+Po potvrzení v Dotykačce (Allow) skončíte na adrese s <b>token=…</b> – ten zkopírujte.</p>
+<script>
+async function hmacHex(key, msg){
+  const enc = new TextEncoder();
+  const k = await crypto.subtle.importKey("raw", enc.encode(key), {name:"HMAC", hash:"SHA-256"}, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", k, enc.encode(msg));
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2,"0")).join("");
+}
+document.getElementById("f").addEventListener("submit", async e => {
+  e.preventDefault();
+  const err = document.getElementById("err");
+  err.textContent = "";
+  try {
+    const secret = document.getElementById("sec").value.trim();
+    if (!secret) { err.textContent = "Vložte Client Secret."; return; }
+    const ts = Math.floor(Date.now()/1000);
+    const fields = {
+      client_id: document.getElementById("cid").value.trim(),
+      timestamp: String(ts),
+      signature: await hmacHex(secret, String(ts)),
+      scope: "*",
+      redirect_uri: document.getElementById("red").value.trim(),
+      state: "nk" + ts
+    };
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = "https://admin.dotykacka.cz/client/connect/v2";
+    for (const [n,v] of Object.entries(fields)) {
+      const i = document.createElement("input");
+      i.type = "hidden"; i.name = n; i.value = v; form.appendChild(i);
+    }
+    document.body.appendChild(form);
+    form.submit();
+  } catch (x) { err.textContent = "Chyba: " + x.message; }
+});
+</script>
+</body>
+</html>
