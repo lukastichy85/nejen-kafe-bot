@@ -6,6 +6,7 @@
 const http = require("http");
 const { handleMcpRequest } = require("./mcp");
 const fotky = require("./fotky");
+const odpisy = require("./odpisy");
 
 // Tajná cesta pro MCP konektor (Claude). Bez MCP_SECRET je konektor vypnutý.
 const MCP_SECRET = process.env.MCP_SECRET || "";
@@ -249,6 +250,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   if (process.env.FOTKY_VYPNUTO !== "1") fotky.start({ token: TELEGRAM_TOKEN, ownerChatId: CHAT_ID });
+  if (process.env.ODPISY_VYPNUTO !== "1") odpisy.start({ token: TELEGRAM_TOKEN, ownerChatId: CHAT_ID });
   console.log(`Nejen Kafe Bot spuštěn na portu ${PORT}`);
   console.log(`Test: http://localhost:${PORT}/test`);
   console.log(`Webhook: http://localhost:${PORT}/webhook`);

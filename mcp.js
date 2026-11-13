@@ -503,4 +503,4 @@ async function handleMcpRequest(req, res, body) {
   res.end(JSON.stringify(batch ? results : results[0]));
 }
 
-module.exports = { handleMcpRequest, salesReport, _test: { pragueMidnight, pragueParts, addDays } };
+module.exports = { handleMcpRequest, salesReport, fetchOrders, isCanceled, num, _test: { pragueMidnight, pragueParts, addDays } };
