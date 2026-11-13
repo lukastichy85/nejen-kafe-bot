@@ -15,8 +15,8 @@ const TZ = "Europe/Prague";
 // Nápoje na nulovém účtu (personální káva, odpis kávy) nejsou zbytky z výroby.
 // Klíčová slova lze přepsat proměnnou NAPOJE_KLICOVA_SLOVA (oddělit čárkou).
 const DRINK_KEYWORDS = (process.env.NAPOJE_KLICOVA_SLOVA ||
-  "káva,kafe,espresso,cappuccino,latte,flat white,americano,lungo,ristretto,cortado,macchiato,mocha,doppio," +
-  "filtr,batch,v60,chemex,aeropress,cold brew,čaj,matcha,chai,čokoláda,kakao,mléko,limonáda,džus,juice,voda,sirup,personál")
+  "káva,kava,kafe,espresso,cappuccino,latte,flat white,americano,lungo,ristretto,cortado,macchiato,mocha,doppio," +
+  "filtr,batch,v60,chemex,aeropress,cold brew,čaj,matcha,chai,čokoláda,kakao,mléko,limonáda,džus,juice,voda,sirup,personál,personal")
   .split(",").map((k) => k.trim().toLowerCase()).filter(Boolean);
 
 // "Odpis koláček" / "Odpis - šnek" → "koláček" / "šnek", aby se odpis spároval s prodejním produktem
@@ -33,6 +33,9 @@ function isDrink(name) {
 }
 
 const BRANCH_NAMES = {
+  "160998644": "Mladá Boleslav",
+  "114818684": "Mělník",
+  // ID z administrace (API je nepoužívá)
   "129142134": "Mladá Boleslav",
   "156750726": "Mělník",
 };
@@ -342,7 +345,7 @@ const DATE_PROPS = {
   do: { type: "string", description: "Konec období včetně, RRRR-MM-DD (pražský čas)" },
   pobocka: {
     type: "string",
-    description: "Volitelně ID pobočky: 129142134 = Mladá Boleslav, 156750726 = Mělník. Bez vyplnění obě.",
+    description: "Volitelně ID pobočky: 160998644 = Mladá Boleslav, 114818684 = Mělník. Bez vyplnění obě.",
   },
 };
 

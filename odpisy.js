@@ -23,14 +23,14 @@ function parseClose(v, def) {
 const BRANCHES = {
   mb: {
     name: "Mladá Boleslav",
-    id: process.env.POBOCKA_MB || "",
-    close: parseClose(process.env.ZAVIRACKA_MB, ""),
+    id: process.env.POBOCKA_MB || "160998644",
+    close: parseClose(process.env.ZAVIRACKA_MB, "19:00,18:00"),
     chatId: process.env.FOTO_SKUPINA_MB || "",
   },
   melnik: {
     name: "Mělník",
-    id: process.env.POBOCKA_MELNIK || "",
-    close: parseClose(process.env.ZAVIRACKA_MELNIK, ""),
+    id: process.env.POBOCKA_MELNIK || "114818684",
+    close: parseClose(process.env.ZAVIRACKA_MELNIK, "18:30,18:00"),
     chatId: process.env.FOTO_SKUPINA_MELNIK || "",
   },
 };
