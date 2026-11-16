@@ -11,6 +11,7 @@
 
 const https = require("https");
 const vitrina = require("./vitrina");
+const objednavky = require("./objednavky");
 
 const TZ = "Europe/Prague";
 const TOLERANCE = Number(process.env.FOTO_TOLERANCE_MIN || 15);
@@ -165,6 +166,37 @@ async function handleMessage(msg) {
     return;
   }
 
+  if (/^\/objedn[aá]vky/i.test(text)) {
+    await send(msg.chat.id, objednavky.formatOpen());
+    return;
+  }
+  if (/^\/hotovo/i.test(text)) {
+    if (String(msg.from?.id) !== String(OWNER_CHAT)) return;
+    const arg = text.replace(/^\/hotovo(@\w+)?/i, "").trim().toLowerCase();
+    const ids = /^v[sš]e$/.test(arg) ? "vse" : (arg.match(/\d+/g) || []).map(Number);
+    if (ids !== "vse" && !ids.length) { await send(msg.chat.id, "Napište čísla položek, např. /hotovo 2 5, nebo /hotovo vse."); return; }
+    const d = objednavky.done(ids, new Date().toISOString());
+    await send(msg.chat.id, d.length ? `✅ Odškrtnuto: ${d.map((i) => objednavky.esc(i.text)).join(", ")}` : "Nic k odškrtnutí.");
+    return;
+  }
+  const obj = objednavky.parse(text);
+  if (obj && obj.length) {
+    const branch = branchForMessage(msg);
+    const pobocka = branch ? BRANCHES[branch].name : (msg.chat.type === "private" ? "Lukas" : msg.chat.title || "?");
+    const kdo = [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(" ") || "?";
+    const added = objednavky.add(obj, { pobocka, kdo, kdy: new Date().toISOString() });
+    await tg("setMessageReaction", { chat_id: msg.chat.id, message_id: msg.message_id, reaction: [{ type: "emoji", emoji: "✍" }] }).catch(() => {});
+    if (added.length) {
+      await send(msg.chat.id, `📝 Zapsáno k objednání: ${added.map((i) => objednavky.esc(i.text)).join(", ")}`, { reply_to_message_id: msg.message_id });
+      if (OWNER_CHAT && String(OWNER_CHAT) !== String(msg.chat.id)) {
+        await send(OWNER_CHAT, `🛒 <b>${objednavky.esc(pobocka)}</b> (${objednavky.esc(kdo)}) potřebuje objednat:\n` + added.map((i) => `${i.id}. ${objednavky.esc(i.text)}`).join("\n"));
+      }
+    } else {
+      await send(msg.chat.id, "To už je zapsané 👍", { reply_to_message_id: msg.message_id });
+    }
+    return;
+  }
+
   const hasPhoto = Boolean(msg.photo || (msg.document && /^image\//.test(msg.document.mime_type || "")));
   if (!hasPhoto) return;
 
@@ -266,4 +298,4 @@ function start({ token, ownerChatId }) {
   console.log("Hlídání fotek vitríny spuštěno");
 }
 
-module.exports = { start, _test: { isHoliday, isClosed, easterSunday, pragueNow, matchSlot, slotsFor, summaryText, handleMessage, checkSlots, state } };
+module.exports = { start, _test: { setOwner: (o, t) => { OWNER_CHAT = o; TOKEN = t || "x"; }, isHoliday, isClosed, easterSunday, pragueNow, matchSlot, slotsFor, summaryText, handleMessage, checkSlots, state } };

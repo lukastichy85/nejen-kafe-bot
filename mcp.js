@@ -405,6 +405,19 @@ const TOOLS = [
     handler: async (a) => ({ zaznamu: vitrina.history(a).length, data: vitrina.history(a) }),
   },
   {
+    name: "objednavky",
+    description:
+      "Seznam věcí k objednání, které obsluha napsala do Telegramové skupiny kavárny (např. skořice, mouka, čokoláda). " +
+      "Vrací otevřené položky (číslo, text, pobočka, kdo, kdy). S parametrem vse=true i odškrtnuté (posledních 90 dní).",
+    inputSchema: { type: "object", properties: { vse: { type: "boolean" } } },
+    annotations: { readOnlyHint: true },
+    handler: async ({ vse } = {}) => {
+      const o = require("./objednavky");
+      const list = vse ? o.all() : o.open();
+      return { otevrenych: o.open().length, polozky: list };
+    },
+  },
+  {
     name: "dotykacka_cteni",
     description:
       "Přímé čtení libovolné entity z Dotykačka API v2 (jen GET) v cloudu Nejen Kafe, např. 'branches', 'products', " +
